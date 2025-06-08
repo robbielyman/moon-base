@@ -1,0 +1,19 @@
+.{
+    .name = .moon_base,
+    .version = "0.0.0",
+    .fingerprint = 0x565deb0bd81d0ff0, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.0-dev.643+dc6ffc28b",
+    .dependencies = .{
+        .zlua = .{
+            .url = "git+https://github.com/natecraddock/ziglua#f7b3c90d026afd33b0a70debfd54ea50f1acfc1b",
+            .hash = "zlua-0.1.0-hGRpC-IZBQDD9MfKTbeRE3z_Qg-kI2SqnT1JaRl9W9Sq",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
+}
