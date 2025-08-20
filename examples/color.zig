@@ -5,8 +5,8 @@ const std = @import("std");
 pub const Color = struct {
     rgba: [4]u8,
 
-    pub fn format(color: Color, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-        try writer.print("#{x:0>2}{x:0>2}{x:0>2}{x:0>2}", .{
+    pub fn format(color: Color, w: *std.io.Writer) !void {
+        try w.print("#{x:0>2}{x:0>2}{x:0>2}{x:0>2}", .{
             color.rgba[0],
             color.rgba[1],
             color.rgba[2],

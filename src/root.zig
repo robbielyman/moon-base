@@ -6,16 +6,50 @@ pub const Lua = zlua.Lua;
 const std = @import("std");
 const testing = std.testing;
 
-pub const BufWriter = std.io.Writer(*zlua.Buffer, error{}, struct {
-    fn write(buf: *zlua.Buffer, bytes: []const u8) error{}!usize {
-        buf.addString(bytes);
-        return bytes.len;
-    }
-}.write);
+pub const LuaBuffer = struct {
+    const vtable: std.io.Writer.VTable = .{
+        .drain = drain,
+    };
 
-pub fn bufWriter(buffer: *zlua.Buffer) BufWriter {
-    return .{ .context = buffer };
-}
+    fn drain(w: *std.io.Writer, data: []const []const u8, splat: usize) error{WriteFailed}!usize {
+        var ret = w.end;
+        const lb: *LuaBuffer = @fieldParentPtr("interface", w);
+        lb.buffer.addString(w.buffer[0..w.end]);
+        w.end = 0;
+        for (0..data.len - 1) |i| {
+            const chunk = data[i];
+            lb.buffer.addString(chunk);
+            ret += chunk.len;
+        }
+        for (0..splat) |_| {
+            const chunk = data[data.len - 1];
+            lb.buffer.addString(chunk);
+            ret += chunk.len;
+        }
+        return ret;
+    }
+    interface: std.io.Writer,
+    buffer: zlua.Buffer,
+    arr: [1024]u8,
+
+    pub fn init(lb: *LuaBuffer, l: *Lua) void {
+        lb.* = .{
+            .buffer = undefined,
+            .arr = undefined,
+            .interface = .{
+                .buffer = &lb.arr,
+                .end = 0,
+                .vtable = &vtable,
+            },
+        };
+        lb.buffer.init(l);
+    }
+
+    pub fn push(lb: *LuaBuffer) void {
+        lb.interface.flush() catch unreachable;
+        lb.buffer.pushResult();
+    }
+};
 
 /// this function is tasked with producing a valid object of type T
 /// from the argument at the given lua index
@@ -144,12 +178,11 @@ pub fn Functions(comptime T: type) []const zlua.FnReg {
                     fn __tostring(l: ?*zlua.LuaState) callconv(.c) c_int {
                         const lua: *Lua = @ptrCast(l.?);
                         const val = T.pull(lua, 1);
-                        var buf: zlua.Buffer = undefined;
-                        buf.init(lua);
-                        const w = bufWriter(&buf);
+                        var w: LuaBuffer = undefined;
+                        w.init(lua);
                         errdefer unreachable;
-                        try w.print("{}", .{val});
-                        buf.pushResult();
+                        try w.interface.print("{f}", .{val});
+                        w.push();
                         return 1;
                     }
                 }.__tostring,

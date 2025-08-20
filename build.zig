@@ -16,9 +16,7 @@ pub fn build(b: *std.Build) void {
     moon_base.addImport("zlua", zlua.module("zlua"));
 
     const tests = b.addTest(.{
-        .target = target,
-        .optimize = optimize,
-        .root_source_file = b.path("src/root.zig"),
+        .root_module = moon_base,
     });
     const tests_run = b.addRunArtifact(tests);
     const tests_step = b.step("test", "run the tests");
