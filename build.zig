@@ -22,18 +22,42 @@ pub fn build(b: *std.Build) void {
     const tests_step = b.step("test", "run the tests");
     tests_step.dependOn(&tests_run.step);
 
-    const examples_mod = b.createModule(.{
-        .root_source_file = b.path("examples/color.zig"),
+    const examples_step = b.step("examples", "build the examples");
+
+    const examples_list: []const []const u8 = &.{
+        "color",
+    };
+
+    const runfile = b.createModule(.{
+        .root_source_file = b.path("src/runfile.zig"),
         .target = target,
         .optimize = optimize,
     });
+    runfile.addImport("zlua", zlua.module("zlua"));
 
-    const examples = b.addLibrary(.{
-        .root_module = examples_mod,
-        .linkage = .dynamic,
-        .name = "color",
-    });
-    examples_mod.addImport("moon-base", moon_base);
-    const examples_step = b.step("examples", "build the examples");
-    examples_step.dependOn(&b.addInstallArtifact(examples, .{}).step);
+    const runner = b.addExecutable(.{ .root_module = runfile, .name = "lua" });
+
+    for (examples_list) |example| {
+        const mod = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .root_source_file = b.path(b.fmt("examples/{s}.zig", .{example})),
+        });
+        mod.addImport("moon-base", moon_base);
+        const lib = b.addLibrary(.{
+            .root_module = mod,
+            .linkage = .dynamic,
+            .name = example,
+        });
+        const suffix: []const u8 = if (target.result.os.tag == .windows) "dll" else "so";
+        const wf = b.addWriteFiles();
+        const name = b.fmt("{s}.{s}", .{ example, suffix });
+        const rename = wf.addCopyFile(lib.getEmittedBin(), name);
+        const install = b.addInstallFile(rename, name);
+        examples_step.dependOn(&install.step);
+        const run = b.addRunArtifact(runner);
+        run.addFileArg(b.path(b.fmt("examples/{s}.lua", .{example})));
+        run.setCwd(wf.getDirectory());
+        tests_step.dependOn(&run.step);
+    }
 }
